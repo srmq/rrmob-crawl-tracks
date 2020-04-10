@@ -1,0 +1,1 @@
+baseUrl = 'https://rrmob-ms-server.herokuapp.com'
