@@ -34,7 +34,7 @@ class PlayHistory(Base):
 
     id = Column('id', Integer, primary_key=True) 
     track_obj = Column(JSONB, nullable=False)
-    played_at = Column(DateTime, nullable=False)
+    played_at = Column(DateTime, nullable=False, index=True)
     context_obj = Column(JSONB, nullable=False)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     fulltrack_id = Column(Integer, ForeignKey('tracks.id'))
