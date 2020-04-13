@@ -51,6 +51,18 @@ def get_User_by_email(session, email):
 def db_insert_User(session, user : User):
     session.add(user)
 
+def get_Track_from_SpotifyId(session, track_spotify_id):
+    return session.query(FullTrack).filter(FullTrack.spot_id == track_spotify_id).first()
+
+def get_Artist_from_SpotifyId(session, artist_spotify_id):
+    return session.query(FullArtist).filter(FullArtist.spot_id == artist_spotify_id).first()
+
+def get_Playlist_from_SpotifyId(session, playlist_spotify_id):
+    return session.query(FullPlaylist).filter(FullPlaylist.spot_id == playlist_spotify_id).first()    
+
+def get_Album_from_SpotifyId(session, album_spotify_id):
+    return session.query(FullAlbum).filter(FullAlbum.spot_id == album_spotify_id).first()
+
 @contextmanager
 def session_scope():
     session = _Session() 

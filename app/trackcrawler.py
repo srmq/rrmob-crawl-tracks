@@ -11,7 +11,11 @@ from . import conf
 from .dbfuncs import (
     create_tables, init_db_engine, drop_tables,
     session_scope, get_PlayHistory_for_User,
-    get_User_by_email, db_insert_User
+    get_User_by_email, db_insert_User,
+    get_Track_from_SpotifyId,
+    get_Artist_from_SpotifyId,
+    get_Playlist_from_SpotifyId,
+    get_Album_from_SpotifyId
 )
 from .dbclasses import (
     Base, User, FullTrack, PlayHistory, 
@@ -25,6 +29,96 @@ def update_spotify_profile(user : User, token_info):
     if userObj:
        user.user_obj = userObj
        user.spot_id = userObj['id']
+
+def retrieve_Track_by_SpotifyId(track_spotify_id, token_info):
+    sp = spotipy.Spotify(auth=token_info)
+    trackObj = sp.track(track_spotify_id)
+    return trackObj
+
+def retrieve_Artist_by_SpotifyId(artist_spotify_id, token_info):
+    sp = spotipy.Spotify(auth=token_info)
+    artistObj = sp.artist(artist_spotify_id)
+    return artistObj
+
+def retrieve_Playlist_by_SpotifyId(playlist_spotify_id, token_info):
+    sp = spotipy.Spotify(auth=token_info)
+    playlistObj = sp.playlist(playlist_spotify_id)
+    return playlistObj
+
+def retrieve_Album_by_SpotifyId(album_spotify_id, token_info):
+    sp = spotipy.Spotify(auth=token_info)
+    albumObj = sp.album(album_spotify_id)
+    return albumObj
+
+def add_features(fullTrack : FullTrack, token_info):
+    sp = spotipy.Spotify(auth=token_info)
+    afObject = sp.audio_features([fullTrack.spot_id])
+    audioFeatures = AudioFeatures(feature_obj=afObject)
+    fullTrack.audioFeatures = audioFeatures
+    aaObject = sp.audio_analysis(fullTrack.spot_id)
+    audioAnalysis = AudioAnalysis(analysis_obj=aaObject)
+    fullTrack.audioAnalysis = audioAnalysis
+
+def processFromEpoch(session, token_info, initDateEpoch, dbUser, limit=50):
+    sp = spotipy.Spotify(auth=token_info)
+    played = sp.current_user_recently_played(limit=limit, after=initDateEpoch)
+    #json_formatted_str = json.dumps(played, indent=2)
+    #print(json_formatted_str)
+    itemArray = played['items']
+    lastDateSeen = datetime.datetime(year=1970, month=1, day=1, hour=0, minute=0, second=0)
+    for obj in itemArray:
+        track_obj = obj['track']
+        played_at = parser.isoparse(obj['played_at'])
+        if played_at > lastDateSeen:
+            lastDateSeen = played_at
+        context_obj = obj['context']
+        newPlayHistory = PlayHistory(
+            track_obj=track_obj, played_at=played_at, 
+            context_obj=context_obj, parentUser=dbUser
+            )
+        fullTrack = get_Track_from_SpotifyId(session, track_obj['id'])
+        if not fullTrack:
+            trackJsonObj = retrieve_Track_by_SpotifyId(token_info, track_obj['id'])
+            if trackJsonObj:
+                fullTrack = FullTrack(fulltrack_obj=trackJsonObj, spot_id=trackJsonObj['id'])
+                add_features(fullTrack, token_info)
+                newPlayHistory.fullTrack = fullTrack
+        else:
+            newPlayHistory.fullTrack = fullTrack
+        fromType = context_obj['type']
+        contextURI = context_obj['uri']
+        contextID = contextURI[contextURI.rindex(':')+1:-1]
+        if fromType == 'artist':
+            fullArtist = get_Artist_from_SpotifyId(session, contextID)
+            if not fullArtist:
+                fullArtistObj = retrieve_Artist_by_SpotifyId(contextID, token_info)
+                if fullArtistObj:
+                    fullArtist = FullArtist(fullartist_obj=fullArtistObj, spot_id=fullArtistObj['id'])
+                    newPlayHistory.fromArtist = fullArtist
+            else:
+                newPlayHistory.fromArtist = fullArtist
+        elif fromType == 'playlist':
+            fullPlaylist = get_Playlist_from_SpotifyId(session, contextID)
+            if not fullPlaylist:
+                fullPlaylistObj = retrieve_Playlist_by_SpotifyId(contextID, token_info)
+                if fullPlaylistObj:
+                    fullPlaylist = FullPlaylist(fullplaylist_obj=fullPlaylistObj, spot_id=fullPlaylistObj['id'])
+                    newPlayHistory.fromPlaylist = fullPlaylist
+            else:
+                newPlayHistory.fromPlaylist = fullPlaylist
+        elif fromType == 'album':
+            fullAlbum = get_Album_from_SpotifyId(session, contextID)
+            if not fullAlbum:
+                fullAlbumObj = retrieve_Album_by_SpotifyId(contextID, token_info)
+                if fullAlbumObj:
+                    fullAlbum = FullAlbum(fullalbum_obj=fullAlbumObj, spot_id=fullAlbumObj['id'])
+                    newPlayHistory.fromAlbum = fullAlbum
+            else:
+                newPlayHistory.fromAlbum = fullAlbum
+        session.add(newPlayHistory)
+    return len(itemArray), lastDateSeen, played['cursors']
+
+
 
 def getTracksPlayedAtDate(root_pass=None, date=None, default_tz=tz.tzoffset('America/Recife (-03)', -10800)):
     """The tracks played by that user at a particular date.
@@ -81,23 +175,16 @@ def getTracksPlayedAtDate(root_pass=None, date=None, default_tz=tz.tzoffset('Ame
             if lastPlayHistoryOnDate:
                 myDateTime = lastPlayHistoryOnDate.played_at + datetime.timedelta(seconds=1)
             initDateEpoch = int(myDateTime.timestamp()*1000)
-            sp = spotipy.Spotify(auth=token_info)
-            played = sp.current_user_recently_played(limit=50, after=initDateEpoch)
-            itemArray = played['items']
-            for obj in itemArray:
-                #json_formatted_str = json.dumps(played, indent=2)
-                #print(json_formatted_str)
-                track_obj = obj['track']
-                played_at = parser.isoparse(obj['played_at'])
-                context_obj = obj['context']
-                newPlayHistory = PlayHistory(
-                    track_obj=track_obj, played_at=played_at, 
-                    context_obj=context_obj, user_id=dbUser.id
-                    )
-                #FIXME update fulltrack_id e from_*
 
-            
-            print("Number of itens: " + str(len(played['items'])))   
+            limit = 50
+            while True:
+                nproc, lastSeen, cursors = processFromEpoch(
+                    session, token_info, initDateEpoch, dbUser, limit)
+                initDate = datetime.fromtimestamp(int(initDateEpoch/1000), datetime.timezone.utc)
+                if not (nproc == limit and initDate.date() == lastSeen.date()):
+                    break
+                else:
+                    initDateEpoch = int(cursors['after'])
 
 def action_create(args):
     dbUrl = args.database_url[0]
