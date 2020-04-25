@@ -48,10 +48,12 @@ def retrieve_Artist_by_SpotifyId(artist_spotify_id):
 def retrieve_Playlist_by_SpotifyId(playlist_spotify_id, token_info):
     sp = spotipy.Spotify(auth=token_info)
     playlistObj = None
-    try :
+    try:
         playlistObj = sp.playlist(playlist_spotify_id)
     except Exception as e:
         msg = "An Error ocurred: " + str(e)
+        print(msg)
+        print("Traceback follows:")
         traceback.print_exc()
     finally:    
         return playlistObj
@@ -182,29 +184,36 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
         users = users['users']
     
     for user in users:
-        print('Processing user: ' + user['fullname'] + ' <' + user['email'] + '>' )
+        try:
+            print('Processing user: ' + user['fullname'] + ' <' + user['email'] + '>' )
 
-        with session_scope() as session:
-            dbUser = get_User_by_email(session, user['email'])
-            if not dbUser:
-                print("User not found, adding her")
-                dbUser = User(email=user['email'])
-                db_insert_User(session, dbUser)
-                update_spotify_profile(dbUser, get_accesstoken_for_user(user['email']))
-            lastPlayHistoryOnDate = get_PlayHistory_for_User(session, dbUser, myDateTime, tomorrowDate).first()
-            if lastPlayHistoryOnDate:
-                myDateTime = lastPlayHistoryOnDate.played_at + datetime.timedelta(seconds=1)
-            initDateEpoch = int(myDateTime.timestamp()*1000)
+            with session_scope() as session:
+                dbUser = get_User_by_email(session, user['email'])
+                if not dbUser:
+                    print("User not found, adding her")
+                    dbUser = User(email=user['email'])
+                    db_insert_User(session, dbUser)
+                    update_spotify_profile(dbUser, get_accesstoken_for_user(user['email']))
+                lastPlayHistoryOnDate = get_PlayHistory_for_User(session, dbUser, myDateTime, tomorrowDate).first()
+                if lastPlayHistoryOnDate:
+                    myDateTime = lastPlayHistoryOnDate.played_at + datetime.timedelta(seconds=1)
+                initDateEpoch = int(myDateTime.timestamp()*1000)
 
-            limit = 50
-            while True:
-                nproc, lastSeen, cursors = processFromEpoch(
-                    session, user['email'], initDateEpoch, dbUser, limit)
-                initDate = datetime.datetime.fromtimestamp(int(initDateEpoch/1000), datetime.timezone.utc)
-                if not (nproc == limit and initDate.date() == lastSeen.date()):
-                    break
-                else:
-                    initDateEpoch = int(cursors['after'])
+                limit = 50
+                while True:
+                    nproc, lastSeen, cursors = processFromEpoch(
+                        session, user['email'], initDateEpoch, dbUser, limit)
+                    initDate = datetime.datetime.fromtimestamp(int(initDateEpoch/1000), datetime.timezone.utc)
+                    if not (nproc == limit and initDate.date() == lastSeen.date()):
+                        break
+                    else:
+                        initDateEpoch = int(cursors['after'])
+        except Exception as e:
+            msg = "An Error ocurred while processing user " + user['fullname'] + ' <' + user['email'] + '>' + ": " + str(e)
+            print(msg)
+            print("Traceback follows:")
+            traceback.print_exc()
+            print("Skipping to next user...")
 
 def action_create(args):
     dbUrl = args.database_url[0]
