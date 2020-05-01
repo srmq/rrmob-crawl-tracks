@@ -193,7 +193,7 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
     
     for user in users:
         try:
-            print('Processing user: ' + (user['fullname']).encode('utf-8') + ' <' + (user['email']).encode('utf-8') + '>' )
+            print('Processing user: ' + user['fullname'] + ' <' + user['email'] + '>' )
 
             with session_scope() as session:
                 dbUser = get_User_by_email(session, user['email'])
@@ -217,7 +217,7 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
                     else:
                         initDateEpoch = int(cursors['after'])
         except Exception as e:
-            msg = "An Error ocurred while processing user " + (user['fullname']).encode('utf-8') + ' <' + (user['email']).encode('utf-8') + '>' + ": " + str(e)
+            msg = "An Error ocurred while processing user " + user['fullname'] + ' <' + user['email'] + '>' + ": " + str(e)
             print(msg)
             print("Traceback follows:")
             traceback.print_exc()
