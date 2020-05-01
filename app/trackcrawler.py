@@ -108,9 +108,9 @@ def processFromEpoch(session, email, initDateEpoch, dbUser, limit=50):
                 newPlayHistory.fullTrack = fullTrack
         else:
             newPlayHistory.fullTrack = fullTrack
-        fromType = context_obj['type']
-        contextURI = context_obj['uri']
-        contextID = contextURI[contextURI.rindex(':')+1:]
+        fromType = context_obj['type'] if context_obj else None
+        contextURI = context_obj['uri'] if context_obj else None
+        contextID = contextURI[contextURI.rindex(':')+1:] if contextURI else None
         if fromType == 'artist':
             fullArtist = get_Artist_from_SpotifyId(session, contextID)
             if not fullArtist:
