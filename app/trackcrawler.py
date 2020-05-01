@@ -54,7 +54,7 @@ def retrieve_Playlist_by_SpotifyId(playlist_spotify_id, token_info):
         msg = "An Error ocurred: " + str(e)
         print(msg)
         print("Traceback follows:")
-        traceback.print_exc()
+        print(traceback.format_exc())
     finally:    
         return playlistObj
 
@@ -220,7 +220,7 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
             msg = "An Error ocurred while processing user " + user['fullname'] + ' <' + user['email'] + '>' + ": " + str(e)
             print(msg)
             print("Traceback follows:")
-            traceback.print_exc()
+            print(traceback.format_exc())
             print("Skipping to next user...")
 
 def action_create(args):
