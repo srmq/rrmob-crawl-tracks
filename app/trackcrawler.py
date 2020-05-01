@@ -67,12 +67,20 @@ def retrieve_Album_by_SpotifyId(album_spotify_id):
 def add_features(fullTrack : FullTrack):
     token_info = get_app_accesstoken()            
     sp = spotipy.Spotify(auth=token_info)
-    afObject = sp.audio_features([fullTrack.spot_id])
-    audioFeatures = AudioFeatures(feature_obj=afObject)
-    fullTrack.audioFeatures = audioFeatures
-    aaObject = sp.audio_analysis(fullTrack.spot_id)
-    audioAnalysis = AudioAnalysis(analysis_obj=aaObject)
-    fullTrack.audioAnalysis = audioAnalysis
+    try:
+        afObject = sp.audio_features([fullTrack.spot_id])
+        audioFeatures = AudioFeatures(feature_obj=afObject)
+        fullTrack.audioFeatures = audioFeatures
+    except Exception as e:
+        msg = "An Error ocurred while trying to get audio features: " + str(e)
+        print(msg)
+    try:
+        aaObject = sp.audio_analysis(fullTrack.spot_id)
+        audioAnalysis = AudioAnalysis(analysis_obj=aaObject)
+        fullTrack.audioAnalysis = audioAnalysis
+    except Exception as e:
+        msg = "An Error ocurred while trying to get audio analysis: " + str(e)
+        print(msg)
 
 def processFromEpoch(session, email, initDateEpoch, dbUser, limit=50):
     sp = spotipy.Spotify(auth=get_accesstoken_for_user(email))
@@ -185,7 +193,7 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
     
     for user in users:
         try:
-            print('Processing user: ' + user['fullname'] + ' <' + user['email'] + '>' )
+            print('Processing user: ' + (user['fullname']).encode('utf-8') + ' <' + (user['email']).encode('utf-8') + '>' )
 
             with session_scope() as session:
                 dbUser = get_User_by_email(session, user['email'])
@@ -209,7 +217,7 @@ def getTracksPlayedAtDate(date=None, default_tz=tz.tzoffset('America/Recife (-03
                     else:
                         initDateEpoch = int(cursors['after'])
         except Exception as e:
-            msg = "An Error ocurred while processing user " + user['fullname'] + ' <' + user['email'] + '>' + ": " + str(e)
+            msg = "An Error ocurred while processing user " + (user['fullname']).encode('utf-8') + ' <' + (user['email']).encode('utf-8') + '>' + ": " + str(e)
             print(msg)
             print("Traceback follows:")
             traceback.print_exc()
