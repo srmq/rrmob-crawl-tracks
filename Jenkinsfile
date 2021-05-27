@@ -32,6 +32,7 @@ pipeline {
                                               variable: 'ROOTPASS')]) {
                sh """
                . ./venv/bin/activate
+               PYTHONIOENCODING=utf-8 python3 ./wakeup.py
                PYTHONIOENCODING=utf-8 python3 ./startup.py crawl -c ${ROOTPASS} ${yesterdayStr} -d postgres://${DBUSER}:${DBPASS}@tamandare.cin.ufpe.br:5432/spotcrawler
                """
             }
